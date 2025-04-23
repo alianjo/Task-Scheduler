@@ -1,0 +1,63 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15
+    container_name: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_DB: task_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Amir1380
+    ports:
+      - "5432:5432"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  web:
+    build: .
+    container_name: django_app
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - rabbitmq
+
+  celery:
+    build: .
+    container_name: celery_worker
+    command: celery -A task_scheduler worker -l info
+    volumes:
+      - .:/app
+    depends_on:
+      - web
+      - rabbitmq
+      - db
+
+  celery-beat:
+    build: .
+    container_name: celery_beat
+    command: celery -A task_scheduler beat -l info
+    volumes:
+      - .:/app
+    depends_on:
+      - web
+      - rabbitmq
+      - db
+
+volumes:
+  postgres_data:
